@@ -284,7 +284,8 @@ decouple library dependencies with standard string, memory and so on.
 
     /* set up rotate style */
     #if (defined(_MSC_VER) || defined(__BCPLUSPLUS__)) && \
-        !defined(WOLFSSL_SGX) && !defined(INTIME_RTOS)
+        !defined(WOLFSSL_SGX) && !defined(WOLFSSL_WASM) && \
+        !defined(INTIME_RTOS)
         #define INTEL_INTRINSICS
         #define FAST_ROTATE
     #elif defined(__MWERKS__) && TARGET_CPU_PPC
@@ -636,7 +637,7 @@ decouple library dependencies with standard string, memory and so on.
             #define XSTRNCASECMP(s1,s2,n) _strnicmp((s1),(s2),(n))
         #else
             #if defined(HAVE_STRINGS_H) && defined(WOLF_C99) && \
-                !defined(WOLFSSL_SGX)
+                !defined(WOLFSSL_SGX) && !defined(WOLFSSL_WASM)
                 #include <strings.h>
             #endif
             #if defined(WOLFSSL_DEOS)
