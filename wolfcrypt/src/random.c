@@ -129,6 +129,8 @@ int wc_RNG_GenerateByte(WC_RNG* rng, byte* b)
 
 #if defined(WOLFSSL_SGX)
     #include <sgx_trts.h>
+#elif defined(WOLFSSL_WASM)
+    #include <unistd.h>
 #elif defined(USE_WINDOWS_API)
     #ifndef _WIN32_WINNT
         #define _WIN32_WINNT 0x0400
@@ -2558,6 +2560,22 @@ static int wc_GenerateRand_IntelRD(OS_Seed* os, byte* output, word32 sz)
 
         return 0;
     }
+
+#elif defined(WOLFSSL_WASM)
+
+int wc_GenerateSeed(OS_Seed* os, byte* output, word32 sz)
+{
+    int ret;
+    (void)os;
+
+    /* getentropy results in the WASI call "random_get", which 
+     * guarantees a high-quality random data.
+     */
+    ret = getentropy(output, sz);
+
+    return (ret != -1) ? 0 : 1;
+}
+
 
 #elif defined(WOLFSSL_SGX)
 
