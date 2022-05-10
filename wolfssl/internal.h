@@ -215,8 +215,8 @@
     #endif
 #endif
 
-#ifndef CHAR_BIT
-    /* Needed for DTLS without big math */
+#if !defined(CHAR_BIT) || (defined(OPENSSL_EXTRA) && !defined(INT_MAX))
+    /* Needed for DTLS without big math and INT_MAX */
     #include <limits.h>
 #endif
 
@@ -1761,8 +1761,8 @@ WOLFSSL_LOCAL int SNI_Callback(WOLFSSL* ssl);
 #endif
 #endif
 
-WOLFSSL_LOCAL int DecryptTls(WOLFSSL* ssl, byte* plain, const byte* input,
-                             word16 sz, int doAlert);
+WOLFSSL_LOCAL int ChachaAEADEncrypt(WOLFSSL* ssl, byte* out, const byte* input,
+                              word16 sz); /* needed by sniffer */
 
 #ifdef WOLFSSL_TLS13
 WOLFSSL_LOCAL int  DecryptTls13(WOLFSSL* ssl, byte* output, const byte* input,
@@ -3018,6 +3018,7 @@ struct WOLFSSL_CTX {
     #ifdef HAVE_ECC
         CallbackEccKeyGen EccKeyGenCb;  /* User EccKeyGen Callback Handler */
         CallbackEccSign   EccSignCb;    /* User EccSign   Callback handler */
+        void*             EccSignCtx;   /* Ecc Sign       Callback Context */
         CallbackEccVerify EccVerifyCb;  /* User EccVerify Callback handler */
         CallbackEccSharedSecret EccSharedSecretCb; /* User EccVerify Callback handler */
     #endif /* HAVE_ECC */

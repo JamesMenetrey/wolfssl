@@ -1079,14 +1079,17 @@ static int asn1_string_copy_to_buffer(WOLFSSL_ASN1_STRING* str, byte** buf,
 
 int wolfSSL_X509_add_ext(WOLFSSL_X509 *x509, WOLFSSL_X509_EXTENSION *ext, int loc)
 {
+    int nid;
+
     WOLFSSL_ENTER("wolfSSL_X509_add_ext");
 
-    if (!x509 || !ext || !ext->obj || loc >= 0) {
+    if (!x509 || !ext || loc >= 0) {
         WOLFSSL_MSG("Bad parameter");
         return WOLFSSL_FAILURE;
     }
+    nid = (ext->obj != NULL) ? ext->obj->type : ext->value.nid;
 
-    switch (ext->obj->type) {
+    switch (nid) {
     case NID_authority_key_identifier:
         if (x509->authKeyIdSrc != NULL) {
             /* If authKeyId points into authKeyIdSrc then free it and
@@ -2348,16 +2351,19 @@ void wolfSSL_X509V3_set_ctx_nodb(WOLFSSL_X509V3_CTX* ctx)
 #endif /* !NO_WOLFSSL_STUB */
 
 #ifdef OPENSSL_ALL
-static WOLFSSL_X509_EXTENSION* createExtFromStr(int nid, const char *value) {
-    WOLFSSL_X509_EXTENSION* ext = wolfSSL_X509_EXTENSION_new();
+static WOLFSSL_X509_EXTENSION* createExtFromStr(int nid, const char *value)
+{
+    WOLFSSL_X509_EXTENSION* ext;
 
+    if (value == NULL)
+        return NULL;
+
+    ext = wolfSSL_X509_EXTENSION_new();
     if (ext == NULL) {
         WOLFSSL_MSG("memory error");
         return NULL;
     }
-
-    if (value == NULL)
-        return NULL;
+    ext->value.nid = nid;
 
     switch (nid) {
         case NID_subject_key_identifier:
@@ -2371,8 +2377,18 @@ static WOLFSSL_X509_EXTENSION* createExtFromStr(int nid, const char *value) {
             break;
         case NID_subject_alt_name:
         {
-            WOLFSSL_GENERAL_NAMES* gns = wolfSSL_sk_new_null();
+            WOLFSSL_GENERAL_NAMES* gns;
             WOLFSSL_GENERAL_NAME* gn;
+
+            if (wolfSSL_ASN1_STRING_set(&ext->value, value, -1)
+                    != WOLFSSL_SUCCESS) {
+                WOLFSSL_MSG("wolfSSL_ASN1_STRING_set error");
+                goto err_cleanup;
+            }
+            ext->value.type = ASN_DNS_TYPE;
+
+            /* add stack of general names */
+            gns = wolfSSL_sk_new_null();
             if (gns == NULL) {
                 WOLFSSL_MSG("wolfSSL_sk_new_null error");
                 goto err_cleanup;
@@ -4276,7 +4292,7 @@ int wolfSSL_GENERAL_NAME_print(WOLFSSL_BIO* out, WOLFSSL_GENERAL_NAME* gen)
         ret = wolfSSL_BIO_printf(out, "DNS:");
         ret = (ret > 0) ? WOLFSSL_SUCCESS : WOLFSSL_FAILURE;
         if (ret == WOLFSSL_SUCCESS) {
-            ret = wolfSSL_BIO_printf(out, gen->d.dNSName->strData);
+            ret = wolfSSL_BIO_printf(out, "%s", gen->d.dNSName->strData);
             ret = (ret > 0) ? WOLFSSL_SUCCESS : WOLFSSL_FAILURE;
         }
         break;
@@ -5466,6 +5482,11 @@ int wolfSSL_X509_cmp(const WOLFSSL_X509 *a, const WOLFSSL_X509 *b)
                     }
                 #else
                     {
+                        word32 idx = 0;
+                        int  sz;
+                        byte lbit = 0;
+                        int  rawLen;
+                        unsigned char* rawKey;
                     #ifdef WOLFSSL_SMALL_STACK
                         RsaKey *rsa = (RsaKey*)XMALLOC(sizeof(RsaKey), NULL,
                                 DYNAMIC_TYPE_RSA);
@@ -5476,11 +5497,6 @@ int wolfSSL_X509_cmp(const WOLFSSL_X509 *a, const WOLFSSL_X509 *b)
                     #else
                         RsaKey rsa[1];
                     #endif
-                        word32 idx = 0;
-                        int  sz;
-                        byte lbit = 0;
-                        int  rawLen;
-                        unsigned char* rawKey;
 
                         if (wc_InitRsaKey(rsa, NULL) != 0) {
                             WOLFSSL_MSG("wc_InitRsaKey failure");

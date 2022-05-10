@@ -7,7 +7,7 @@
 #
 AC_COPYRIGHT([Copyright (C) 2006-2020 wolfSSL Inc.])
 AC_PREREQ([2.69])
-AC_INIT([wolfssl],[5.2.0],[https://github.com/wolfssl/wolfssl/issues],[wolfssl],[https://www.wolfssl.com])
+AC_INIT([wolfssl],[5.3.0],[https://github.com/wolfssl/wolfssl/issues],[wolfssl],[https://www.wolfssl.com])
 AC_CONFIG_AUX_DIR([build-aux])
 
 # The following sets CFLAGS to empty if unset on command line.  We do not
@@ -38,7 +38,7 @@ LT_INIT([disable-static win32-dll])
 AC_ARG_VAR(EXTRA_CFLAGS, [Extra CFLAGS to add to autoconf-computed arg list.  Can also supply directly to make.])
 
 #shared library versioning
-WOLFSSL_LIBRARY_VERSION=32:0:0
+WOLFSSL_LIBRARY_VERSION=33:0:0
 #                        | | |
 #                 +------+ | +---+
 #                 |        |     |
@@ -1393,6 +1393,7 @@ then
     AM_CFLAGS="$AM_CFLAGS -DKEEP_OUR_CERT"
     AM_CFLAGS="$AM_CFLAGS -DKEEP_PEER_CERT"
     AM_CFLAGS="$AM_CFLAGS -DHAVE_KEYING_MATERIAL"
+    AM_CFLAGS="$AM_CFLAGS -DNO_SESSION_CACHE_REF"
 fi
 
 if test "$ENABLED_FORTRESS" = "yes"
@@ -1678,12 +1679,6 @@ AC_ARG_WITH([se050],
         AM_CFLAGS="$AM_CFLAGS -DWOLFSSL_SE050 -DSSS_USE_FTR_FILE"
     ]
 )
-
-# sniffer doesn't work in maxstrength mode
-if test "$ENABLED_SNIFFER" = "yes" && test "$ENABLED_MAXSTRENGTH" = "yes"
-then
-    AC_MSG_ERROR([cannot enable maxstrength in sniffer mode.])
-fi
 
 ENABLED_SNIFFTEST=no
 AS_IF([ test "x$ENABLED_SNIFFER" = "xyes" ],
@@ -3919,7 +3914,7 @@ fi
 
 if test "$ENABLED_POLY1305" = "yes"
 then
-    AM_CFLAGS="$AM_CFLAGS -DHAVE_POLY1305 -DHAVE_ONE_TIME_AUTH"
+    AM_CFLAGS="$AM_CFLAGS -DHAVE_POLY1305"
 fi
 
 
@@ -4611,11 +4606,22 @@ AC_ARG_ENABLE([pkcs7],
     )
 
 # wolfSSH Options
-AC_ARG_ENABLE([ssh],
-    [AS_HELP_STRING([--enable-ssh],[Enable wolfSSH options (default: disabled)])],
+AC_ARG_ENABLE([wolfssh],
+    [AS_HELP_STRING([--enable-wolfssh],[Enable wolfSSH options (default: disabled)])],
     [ ENABLED_WOLFSSH=$enableval ],
     [ ENABLED_WOLFSSH=no ]
     )
+
+AC_ARG_ENABLE([ssh],
+    [AS_HELP_STRING([--enable-ssh],[Enable wolfSSH options (default: disabled)])],
+    [ ENABLED_SSH=$enableval ],
+    [ ENABLED_SSH=no ]
+    )
+
+if test "x$ENABLED_SSH" = "xyes"
+then
+    ENABLED_WOLFSSH="yes"
+fi
 
 # wolfTPM Options
 AC_ARG_ENABLE([wolftpm],
@@ -4911,7 +4917,8 @@ then
             AM_CFLAGS="$AM_CFLAGS -DECC_SHAMIR"
         fi
     fi
-    if test "x$ENABLED_PKCALLBACKS" = "xno"
+    # Do not enable PK Callbacks in FIPS mode with JNI
+    if test "x$ENABLED_PKCALLBACKS" = "xno" && test "$ENABLED_FIPS" = "no"
     then
         ENABLED_PKCALLBACKS="yes"
         AM_CFLAGS="$AM_CFLAGS -DHAVE_PK_CALLBACKS"
@@ -5235,7 +5242,7 @@ fi
 
 # Encrypt-Then-Mac
 AC_ARG_ENABLE([enc-then-mac],
-    [AS_HELP_STRING([--enable-enc-then-mac],[Enable Encryptr-Then-Mac extension (default: enabled)])],
+    [AS_HELP_STRING([--enable-enc-then-mac],[Enable Encrypt-Then-Mac extension (default: enabled)])],
     [ ENABLED_ENCRYPT_THEN_MAC=$enableval ],
     [ ENABLED_ENCRYPT_THEN_MAC=yes ]
     )
@@ -5244,8 +5251,6 @@ if test "x$ENABLED_TLSX" = "xyes"
 then
     ENABLED_ENCRYPT_THEN_MAC=yes
 fi
-
-AS_IF([test "x$ENABLED_SNIFFER" = "xyes"],[ENABLED_ENCRYPT_THEN_MAC="no"])
 
 if test "x$ENABLED_ENCRYPT_THEN_MAC" = "xyes"
 then
@@ -7099,7 +7104,7 @@ AS_IF([test "x$ENABLED_MCAPI" = "xyes"],
 if test "$ENABLED_OPENSSH" = "yes" || test "$ENABLED_NGINX" = "yes" || \
    test "$ENABLED_SIGNAL" = "yes" || test "$ENABLED_WPAS" = "yes" || \
    test "$ENABLED_FORTRESS" = "yes" || test "$ENABLED_BUMP" = "yes" || \
-   test "$ENABLED_SNIFFER" = "yes" || test "$ENABLED_OPENSSLALL" = "yes" || \
+   test "$ENABLED_OPENSSLALL" = "yes" || \
    test "$ENABLED_LIBWEBSOCKETS" = "yes" || \
    test "x$ENABLED_LIGHTY" = "xyes" || test "$ENABLED_LIBSSH2" = "yes" || \
    test "x$ENABLED_NTP" = "xyes" || test "$ENABLED_RSYSLOG" = "yes"

@@ -251,6 +251,7 @@ struct WOLFSSL_ASN1_STRING {
     char strData[CTC_NAME_SIZE];
     int length;
     int type; /* type of string i.e. CTC_UTF8 */
+    int nid;
     char* data;
     long flags;
     unsigned int   isDynamic:1; /* flag for if data pointer dynamic (1 is yes 0 is no) */
@@ -333,7 +334,7 @@ struct WOLFSSL_ASN1_OBJECT {
     WOLFSSL_GENERAL_NAME* gn;
 #endif
 
-    struct d { /* derefrenced */
+    struct d { /* dereferenced */
         WOLFSSL_ASN1_STRING* dNSName;
         WOLFSSL_ASN1_STRING  ia5_internal;
         WOLFSSL_ASN1_STRING* ia5; /* points to ia5_internal */
@@ -399,6 +400,16 @@ struct WOLFSSL_EVP_PKEY {
     WOLFSSL_DH* dh;
     #endif
     WC_RNG rng;
+    #ifdef HAVE_HKDF
+    const WOLFSSL_EVP_MD* hkdfMd;
+    byte* hkdfSalt;
+    word32 hkdfSaltSz;
+    byte* hkdfKey;
+    word32 hkdfKeySz;
+    byte* hkdfInfo;
+    word32 hkdfInfoSz;
+    int hkdfMode;
+    #endif
 #endif /* OPENSSL_EXTRA || OPENSSL_EXTRA_X509_SMALL */
 #ifdef HAVE_ECC
     int pkey_curve;
@@ -2611,6 +2622,8 @@ WOLFSSL_API void wolfSSL_ASN1_GENERALIZEDTIME_free(WOLFSSL_ASN1_GENERALIZEDTIME*
 WOLFSSL_API int wolfSSL_ASN1_TIME_check(const WOLFSSL_ASN1_TIME* a);
 WOLFSSL_API int wolfSSL_ASN1_TIME_diff(int* days, int* secs, const WOLFSSL_ASN1_TIME* from,
     const WOLFSSL_ASN1_TIME* to);
+WOLFSSL_API int wolfSSL_ASN1_TIME_compare(const WOLFSSL_ASN1_TIME *a,
+    const WOLFSSL_ASN1_TIME *b);
 #ifdef OPENSSL_EXTRA
 WOLFSSL_API WOLFSSL_ASN1_TIME *wolfSSL_ASN1_TIME_set(WOLFSSL_ASN1_TIME *s, time_t t);
 WOLFSSL_API int wolfSSL_ASN1_TIME_set_string(WOLFSSL_ASN1_TIME *s, const char *str);
@@ -3130,6 +3143,8 @@ WOLFSSL_ABI WOLFSSL_API void  wolfSSL_CTX_SetEccSignCb(WOLFSSL_CTX* ctx,
                                                                CallbackEccSign cb);
 WOLFSSL_API void  wolfSSL_SetEccSignCtx(WOLFSSL* ssl, void *ctx);
 WOLFSSL_API void* wolfSSL_GetEccSignCtx(WOLFSSL* ssl);
+WOLFSSL_API void  wolfSSL_CTX_SetEccSignCtx(WOLFSSL_CTX* ctx, void *userCtx);
+WOLFSSL_API void* wolfSSL_CTX_GetEccSignCtx(WOLFSSL_CTX* ctx);
 
 typedef int (*CallbackEccVerify)(WOLFSSL* ssl,
        const unsigned char* sig, unsigned int sigSz,
@@ -4000,6 +4015,9 @@ WOLFSSL_API const char* wolfSSL_OBJ_nid2sn(int n);
 WOLFSSL_API int wolfSSL_OBJ_obj2nid(const WOLFSSL_ASN1_OBJECT *o);
 WOLFSSL_API int wolfSSL_OBJ_get_type(const WOLFSSL_ASN1_OBJECT *o);
 WOLFSSL_API int wolfSSL_OBJ_sn2nid(const char *sn);
+WOLFSSL_API size_t wolfSSL_OBJ_length(const WOLFSSL_ASN1_OBJECT* o);
+WOLFSSL_API const unsigned char* wolfSSL_OBJ_get0_data(
+    const WOLFSSL_ASN1_OBJECT* o);
 
 WOLFSSL_API const char* wolfSSL_OBJ_nid2ln(int n);
 WOLFSSL_API int wolfSSL_OBJ_ln2nid(const char *ln);

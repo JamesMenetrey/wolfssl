@@ -35,6 +35,10 @@
 #include <wolfssl/wolfcrypt/wc_port.h>
 #include <wolfssl/wolfcrypt/ecc.h>
 
+#ifdef HAVE_PTHREAD
+    #include <pthread.h>
+#endif
+
 /* Macro to disable benchmark */
 #ifndef NO_CRYPT_BENCHMARK
 
@@ -53,12 +57,14 @@
        defined(HAVE_PTHREAD) && !defined(HAVE_RENESAS_SYNC)
 
     #define WC_ENABLE_BENCH_THREADING
-    #if defined(_POSIX_THREADS) && !defined(__MINGW32__)
+    #if defined(_POSIX_THREADS)
         typedef void*         THREAD_RETURN;
         typedef pthread_t     THREAD_TYPE;
         #define WOLFSSL_THREAD
+        #if !defined(__MINGW32__)
         #define INFINITE (-1)
         #define WAIT_OBJECT_0 0L
+        #endif
     #elif defined(WOLFSSL_MDK_ARM)|| defined(WOLFSSL_KEIL_TCP_NET) || defined(FREESCALE_MQX)
         typedef unsigned int  THREAD_RETURN;
         typedef int           THREAD_TYPE;
@@ -674,6 +680,7 @@ static const bench_alg bench_other_opt[] = {
 
 #endif /* !WOLFSSL_BENCHMARK_ALL && !NO_MAIN_DRIVER */
 
+#if defined(HAVE_PQC)
 /* The post-quantum-specific mapping of command line option to bit values and
  * OQS name. */
 typedef struct bench_pq_alg {
@@ -752,6 +759,7 @@ static const bench_pq_alg bench_pq_asym_opt[] = {
 #endif
     { NULL, 0, NULL }
 };
+#endif
 
 #ifdef HAVE_WNR
     const char* wnrConfigFile = "wnr-example.conf";
@@ -1373,7 +1381,7 @@ typedef enum bench_stat_type {
         pthread_mutex_unlock(&bench_lock);
     }
 
-#else
+#else /* !WC_ENABLE_BENCH_THREADING */
 
     typedef struct bench_stats {
         const char* algo;
@@ -1397,29 +1405,8 @@ typedef enum bench_stat_type {
         if (gStatsCount >= MAX_BENCH_STATS)
             return bstat;
 
-    #ifdef WC_ENABLE_BENCH_THREADING
-        /* protect bench_stats_head and bench_stats_tail access */
-        pthread_mutex_lock(&bench_lock);
-    #endif
-
         bstat = &gStats[gStatsCount++];
         bstat->algo = algo;
-    #ifdef WC_ENABLE_BENCH_THREADING
-        pthread_mutex_lock(&bench_lock);
-        if (g_threadCount > 1) {
-            int algoLen = (int)(XSTRLEN(algo) + 1);
-            bstat->algo = (const char* )XMALLOC(algoLen, HEAP_HINT,
-                DYNAMIC_TYPE_TMP_BUFFER);
-            if (bstat->algo == NULL) {
-                bstat->algo = "UNKNOWN";
-                type = BENCH_STAT_IGNORE;
-            }
-            else {
-                XSTRNCPY((char* )bstat->algo, algo, algoLen);
-            }
-        }
-        pthread_mutex_unlock(&bench_lock);
-    #endif
         bstat->desc = desc;
         bstat->perfsec = perfsec;
         bstat->perftype = perftype;
@@ -1429,10 +1416,6 @@ typedef enum bench_stat_type {
 
         (void)useDeviceID;
 
-    #ifdef WC_ENABLE_BENCH_THREADING
-        pthread_mutex_unlock(&bench_lock);
-    #endif
-
         return bstat;
     }
 
@@ -1440,35 +1423,6 @@ typedef enum bench_stat_type {
     {
         int i;
         bench_stats_t* bstat;
-
-    #ifdef WC_ENABLE_BENCH_THREADING
-        pthread_mutex_lock(&bench_lock);
-        if (g_threadCount > 1) {
-            int j;
-            bench_stats_t* bstat2;
-
-            /* Merge results and mark duplicates with type ignore. */
-            for (i=0; i<gStatsCount; i++) {
-                bstat = &gStats[i];
-                if (bstat->type == BENCH_STAT_IGNORE)
-                    continue;
-                for (j=i+1; j<gStatsCount; j++) {
-                    bstat2 = &gStats[j];
-                    if (bstat2->type == BENCH_STAT_IGNORE)
-                        continue;
-
-                    if ((XSTRNCMP(bstat->algo, bstat2->algo,
-                                  XSTRLEN(bstat->algo)) == 0) &&
-                        (XSTRNCMP(bstat->desc, bstat2->desc,
-                                  XSTRLEN(bstat->desc)) == 0)) {
-                        bstat2->type = BENCH_STAT_IGNORE;
-                        bstat->perfsec += bstat2->perfsec;
-                    }
-                }
-            }
-        }
-        pthread_mutex_unlock(&bench_lock);
-    #endif
 
         for (i=0; i<gStatsCount; i++) {
             bstat = &gStats[i];
@@ -1480,16 +1434,9 @@ typedef enum bench_stat_type {
                 printf("%-5s %4d %-9s %.3f ops/sec\n",
                     bstat->algo, bstat->strength, bstat->desc, bstat->perfsec);
             }
-        #ifdef WC_ENABLE_BENCH_THREADING
-            pthread_mutex_lock(&bench_lock);
-            if (g_threadCount > 1) {
-                free((void*)bstat->algo);
-            }
-            pthread_mutex_unlock(&bench_lock);
-        #endif
         }
     }
-#endif /* WOLFSSL_ASYNC_CRYPT && !WC_NO_ASYNC_THREADING */
+#endif /* WC_ENABLE_BENCH_THREADING */
 
 static WC_INLINE void bench_stats_init(void)
 {
@@ -3703,6 +3650,7 @@ void bench_md5(int useDeviceID)
     double start;
     int    ret = 0, i, count = 0, times, pending = 0;
     WC_DECLARE_ARRAY(digest, byte, BENCH_MAX_PENDING, WC_MD5_DIGEST_SIZE, HEAP_HINT);
+    WC_INIT_ARRAY(digest, byte, BENCH_MAX_PENDING, WC_MD5_DIGEST_SIZE, HEAP_HINT);
 
     /* clear for done cleanup */
     XMEMSET(hash, 0, sizeof(hash));
@@ -3796,6 +3744,7 @@ void bench_sha(int useDeviceID)
     double start;
     int    ret = 0, i, count = 0, times, pending = 0;
     WC_DECLARE_ARRAY(digest, byte, BENCH_MAX_PENDING, WC_SHA_DIGEST_SIZE, HEAP_HINT);
+    WC_INIT_ARRAY(digest, byte, BENCH_MAX_PENDING, WC_SHA_DIGEST_SIZE, HEAP_HINT);
 
     /* clear for done cleanup */
     XMEMSET(hash, 0, sizeof(hash));
@@ -3887,6 +3836,7 @@ void bench_sha224(int useDeviceID)
     double start;
     int    ret = 0, i, count = 0, times, pending = 0;
     WC_DECLARE_ARRAY(digest, byte, BENCH_MAX_PENDING, WC_SHA224_DIGEST_SIZE, HEAP_HINT);
+    WC_INIT_ARRAY(digest, byte, BENCH_MAX_PENDING, WC_SHA224_DIGEST_SIZE, HEAP_HINT);
 
     /* clear for done cleanup */
     XMEMSET(hash, 0, sizeof(hash));
@@ -3973,6 +3923,7 @@ void bench_sha256(int useDeviceID)
     double start;
     int    ret = 0, i, count = 0, times, pending = 0;
     WC_DECLARE_ARRAY(digest, byte, BENCH_MAX_PENDING, WC_SHA256_DIGEST_SIZE, HEAP_HINT);
+    WC_INIT_ARRAY(digest, byte, BENCH_MAX_PENDING, WC_SHA256_DIGEST_SIZE, HEAP_HINT);
 
     /* clear for done cleanup */
     XMEMSET(hash, 0, sizeof(hash));
@@ -4062,6 +4013,7 @@ void bench_sha384(int useDeviceID)
     double start;
     int    ret = 0, i, count = 0, times, pending = 0;
     WC_DECLARE_ARRAY(digest, byte, BENCH_MAX_PENDING, WC_SHA384_DIGEST_SIZE, HEAP_HINT);
+    WC_INIT_ARRAY(digest, byte, BENCH_MAX_PENDING, WC_SHA384_DIGEST_SIZE, HEAP_HINT);
 
     /* clear for done cleanup */
     XMEMSET(hash, 0, sizeof(hash));
@@ -4148,6 +4100,7 @@ void bench_sha512(int useDeviceID)
     double start;
     int    ret = 0, i, count = 0, times, pending = 0;
     WC_DECLARE_ARRAY(digest, byte, BENCH_MAX_PENDING, WC_SHA512_DIGEST_SIZE, HEAP_HINT);
+    WC_INIT_ARRAY(digest, byte, BENCH_MAX_PENDING, WC_SHA512_DIGEST_SIZE, HEAP_HINT);
 
     /* clear for done cleanup */
     XMEMSET(hash, 0, sizeof(hash));
@@ -4236,6 +4189,7 @@ void bench_sha3_224(int useDeviceID)
     double start;
     int    ret = 0, i, count = 0, times, pending = 0;
     WC_DECLARE_ARRAY(digest, byte, BENCH_MAX_PENDING, WC_SHA3_224_DIGEST_SIZE, HEAP_HINT);
+    WC_INIT_ARRAY(digest, byte, BENCH_MAX_PENDING, WC_SHA3_224_DIGEST_SIZE, HEAP_HINT);
 
     /* clear for done cleanup */
     XMEMSET(hash, 0, sizeof(hash));
@@ -4322,6 +4276,7 @@ void bench_sha3_256(int useDeviceID)
     double start;
     int    ret = 0, i, count = 0, times, pending = 0;
     WC_DECLARE_ARRAY(digest, byte, BENCH_MAX_PENDING, WC_SHA3_256_DIGEST_SIZE, HEAP_HINT);
+    WC_INIT_ARRAY(digest, byte, BENCH_MAX_PENDING, WC_SHA3_256_DIGEST_SIZE, HEAP_HINT);
 
     /* clear for done cleanup */
     XMEMSET(hash, 0, sizeof(hash));
@@ -4408,6 +4363,7 @@ void bench_sha3_384(int useDeviceID)
     double start;
     int    ret = 0, i, count = 0, times, pending = 0;
     WC_DECLARE_ARRAY(digest, byte, BENCH_MAX_PENDING, WC_SHA3_384_DIGEST_SIZE, HEAP_HINT);
+    WC_INIT_ARRAY(digest, byte, BENCH_MAX_PENDING, WC_SHA3_384_DIGEST_SIZE, HEAP_HINT);
 
     /* clear for done cleanup */
     XMEMSET(hash, 0, sizeof(hash));
@@ -4494,6 +4450,7 @@ void bench_sha3_512(int useDeviceID)
     double start;
     int    ret = 0, i, count = 0, times, pending = 0;
     WC_DECLARE_ARRAY(digest, byte, BENCH_MAX_PENDING, WC_SHA3_512_DIGEST_SIZE, HEAP_HINT);
+    WC_INIT_ARRAY(digest, byte, BENCH_MAX_PENDING, WC_SHA3_512_DIGEST_SIZE, HEAP_HINT);
 
     /* clear for done cleanup */
     XMEMSET(hash, 0, sizeof(hash));
@@ -4860,6 +4817,7 @@ static void bench_hmac(int useDeviceID, int type, int digestSz,
     int    ret = 0, i, count = 0, times, pending = 0;
 #ifdef WOLFSSL_ASYNC_CRYPT
     WC_DECLARE_ARRAY(digest, byte, BENCH_MAX_PENDING, WC_MAX_DIGEST_SIZE, HEAP_HINT);
+    WC_INIT_ARRAY(digest, byte, BENCH_MAX_PENDING, WC_MAX_DIGEST_SIZE, HEAP_HINT);
 #else
     byte digest[BENCH_MAX_PENDING][WC_MAX_DIGEST_SIZE];
 #endif
@@ -5674,6 +5632,11 @@ void bench_dh(int useDeviceID)
     WC_DECLARE_ARRAY(agree, byte, BENCH_MAX_PENDING, BENCH_DH_KEY_SIZE, HEAP_HINT);
     WC_DECLARE_ARRAY(priv, byte, BENCH_MAX_PENDING, BENCH_DH_PRIV_SIZE, HEAP_HINT);
     WC_DECLARE_VAR(priv2, byte, BENCH_DH_PRIV_SIZE, HEAP_HINT);
+
+    WC_INIT_ARRAY(pub, byte, BENCH_MAX_PENDING, BENCH_DH_KEY_SIZE, HEAP_HINT);
+    WC_INIT_ARRAY(agree, byte, BENCH_MAX_PENDING, BENCH_DH_KEY_SIZE, HEAP_HINT);
+    WC_INIT_ARRAY(priv, byte, BENCH_MAX_PENDING, BENCH_DH_PRIV_SIZE, HEAP_HINT);
+
 #ifdef WC_DECLARE_VAR_IS_HEAP_ALLOC
     if (pub[0] == NULL || pub2 == NULL || agree[0] == NULL || priv[0] == NULL || priv2 == NULL) {
         ret = MEMORY_E;
@@ -5973,6 +5936,14 @@ void bench_ecc(int useDeviceID, int curveId)
 #if !defined(NO_ASN) && defined(HAVE_ECC_SIGN)
     WC_DECLARE_ARRAY(sig, byte, BENCH_MAX_PENDING, ECC_MAX_SIG_SIZE, HEAP_HINT);
     WC_DECLARE_ARRAY(digest, byte, BENCH_MAX_PENDING, MAX_ECC_BYTES, HEAP_HINT);
+#endif
+
+#ifdef HAVE_ECC_DHE
+    WC_INIT_ARRAY(shared, byte, BENCH_MAX_PENDING, MAX_ECC_BYTES, HEAP_HINT);
+#endif
+#if !defined(NO_ASN) && defined(HAVE_ECC_SIGN)
+    WC_INIT_ARRAY(sig, byte, BENCH_MAX_PENDING, ECC_MAX_SIG_SIZE, HEAP_HINT);
+    WC_INIT_ARRAY(digest, byte, BENCH_MAX_PENDING, MAX_ECC_BYTES, HEAP_HINT);
 #endif
 
 #ifdef WOLFSSL_ASYNC_CRYPT
@@ -7802,6 +7773,7 @@ int main(int argc, char** argv)
                     optMatched = 1;
                 }
             }
+        #if defined(HAVE_PQC)
             /* Known asymmetric post-quantum algorithms */
             for (i=0; !optMatched && bench_pq_asym_opt[i].str != NULL; i++) {
                 if (string_matches(argv[1], bench_pq_asym_opt[i].str)) {
@@ -7810,6 +7782,7 @@ int main(int argc, char** argv)
                     optMatched = 1;
                 }
             }
+        #endif
             /* Other known cryptographic algorithms */
             for (i=0; !optMatched && bench_other_opt[i].str != NULL; i++) {
                 if (string_matches(argv[1], bench_other_opt[i].str)) {

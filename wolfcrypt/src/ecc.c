@@ -1653,6 +1653,8 @@ static void alt_fp_init(mp_int* a)
     !defined(WOLFSSL_CRYPTOCELL) && !defined(WOLF_CRYPTO_CB_ONLY_ECC)
 
 #if !defined(WOLFSSL_SP_MATH) || defined(WOLFSSL_PUBLIC_ECC_ADD_DBL)
+static int _ecc_projective_dbl_point(ecc_point *P, ecc_point *R, mp_int* a,
+                                     mp_int* modulus, mp_digit mp);
 
 /**
    Add two ECC points
@@ -1664,8 +1666,8 @@ static void alt_fp_init(mp_int* a)
    mp       The "b" value from montgomery_setup()
    return   MP_OKAY on success
 */
-int ecc_projective_add_point(ecc_point* P, ecc_point* Q, ecc_point* R,
-                             mp_int* a, mp_int* modulus, mp_digit mp)
+static int _ecc_projective_add_point(ecc_point* P, ecc_point* Q, ecc_point* R,
+                                     mp_int* a, mp_int* modulus, mp_digit mp)
 {
 #if !defined(WOLFSSL_SP_MATH)
 #ifdef WOLFSSL_SMALL_STACK
@@ -1684,10 +1686,6 @@ int ecc_projective_add_point(ecc_point* P, ecc_point* Q, ecc_point* R,
 #endif
    mp_int  *x, *y, *z;
    int     err;
-
-   if (P == NULL || Q == NULL || R == NULL || modulus == NULL) {
-       return ECC_BAD_ARG_E;
-   }
 
    /* if Q == R then swap P and Q, so we don't require a local x,y,z */
    if (Q == R) {
@@ -1779,7 +1777,7 @@ int ecc_projective_add_point(ecc_point* P, ecc_point* Q, ecc_point* R,
                XFREE(t1, NULL, DYNAMIC_TYPE_ECC);
            }
         #endif
-          return ecc_projective_dbl_point(P, R, a, modulus, mp);
+          return _ecc_projective_dbl_point(P, R, a, modulus, mp);
        }
    }
 
@@ -1981,23 +1979,7 @@ done:
 
    return err;
 #else
-    int modBits;
-
-    if (P == NULL || Q == NULL || R == NULL || modulus == NULL) {
-        return ECC_BAD_ARG_E;
-    }
-
-    modBits = mp_count_bits(modulus);
-#ifdef WOLFSSL_PUBLIC_ECC_ADD_DBL
-    if ((mp_count_bits(P->x) > modBits) ||
-        (mp_count_bits(P->y) > modBits) ||
-        (mp_count_bits(P->z) > modBits) ||
-        (mp_count_bits(Q->x) > modBits) ||
-        (mp_count_bits(Q->y) > modBits) ||
-        (mp_count_bits(Q->z) > modBits)) {
-        return ECC_OUT_OF_RANGE_E;
-    }
-#endif
+    int modBits = mp_count_bits(modulus);
 
     (void)a;
     (void)mp;
@@ -2022,6 +2004,25 @@ done:
 #endif
     return ECC_BAD_ARG_E;
 #endif
+}
+
+int ecc_projective_add_point(ecc_point* P, ecc_point* Q, ecc_point* R,
+                             mp_int* a, mp_int* modulus, mp_digit mp)
+{
+    if (P == NULL || Q == NULL || R == NULL || modulus == NULL) {
+        return ECC_BAD_ARG_E;
+    }
+
+    if (mp_cmp(P->x, modulus) != MP_LT ||
+        mp_cmp(P->y, modulus) != MP_LT ||
+        mp_cmp(P->z, modulus) != MP_LT ||
+        mp_cmp(Q->x, modulus) != MP_LT ||
+        mp_cmp(Q->y, modulus) != MP_LT ||
+        mp_cmp(Q->z, modulus) != MP_LT) {
+        return ECC_OUT_OF_RANGE_E;
+    }
+
+    return _ecc_projective_add_point(P, Q, R, a, modulus, mp);
 }
 
 /* ### Point doubling in Jacobian coordinate system ###
@@ -2051,8 +2052,8 @@ done:
    mp       The "b" value from montgomery_setup()
    return   MP_OKAY on success
 */
-int ecc_projective_dbl_point(ecc_point *P, ecc_point *R, mp_int* a,
-                                       mp_int* modulus, mp_digit mp)
+static int _ecc_projective_dbl_point(ecc_point *P, ecc_point *R, mp_int* a,
+                                     mp_int* modulus, mp_digit mp)
 {
 #if !defined(WOLFSSL_SP_MATH)
 #ifdef WOLFSSL_SMALL_STACK
@@ -2071,9 +2072,6 @@ int ecc_projective_dbl_point(ecc_point *P, ecc_point *R, mp_int* a,
 #endif
    mp_int *x, *y, *z;
    int    err;
-
-   if (P == NULL || R == NULL || modulus == NULL)
-       return ECC_BAD_ARG_E;
 
 #ifdef WOLFSSL_SMALL_STACK
 #ifdef WOLFSSL_SMALL_STACK_CACHE
@@ -2339,19 +2337,7 @@ int ecc_projective_dbl_point(ecc_point *P, ecc_point *R, mp_int* a,
 
    return err;
 #else
-    int modBits;
-
-    if (P == NULL || R == NULL || modulus == NULL)
-        return ECC_BAD_ARG_E;
-
-    modBits = mp_count_bits(modulus);
-#ifdef WOLFSSL_PUBLIC_ECC_ADD_DBL
-    if ((mp_count_bits(P->x) > modBits) ||
-        (mp_count_bits(P->y) > modBits) ||
-        (mp_count_bits(P->z) > modBits)) {
-        return ECC_OUT_OF_RANGE_E;
-    }
-#endif
+    int modBits = mp_count_bits(modulus);
 
     (void)a;
     (void)mp;
@@ -2373,6 +2359,21 @@ int ecc_projective_dbl_point(ecc_point *P, ecc_point *R, mp_int* a,
 #endif
     return ECC_BAD_ARG_E;
 #endif
+}
+
+int ecc_projective_dbl_point(ecc_point *P, ecc_point *R, mp_int* a,
+                             mp_int* modulus, mp_digit mp)
+{
+    if (P == NULL || R == NULL || modulus == NULL)
+        return ECC_BAD_ARG_E;
+
+    if (mp_cmp(P->x, modulus) != MP_LT ||
+        mp_cmp(P->y, modulus) != MP_LT ||
+        mp_cmp(P->z, modulus) != MP_LT) {
+        return ECC_OUT_OF_RANGE_E;
+    }
+
+    return _ecc_projective_dbl_point(P, R, a, modulus, mp);
 }
 
 #if !defined(FREESCALE_LTC_ECC) && !defined(WOLFSSL_STM32_PKA) && \
@@ -4198,6 +4199,9 @@ int wc_ecc_shared_secret(ecc_key* private_key, ecc_key* public_key, byte* out,
    !defined(WOLFSSL_ATECC608A)
    CRYS_ECDH_TempData_t tempBuff;
 #endif
+
+   (void)err;
+
    if (private_key == NULL || public_key == NULL || out == NULL ||
                                                             outlen == NULL) {
        return BAD_FUNC_ARG;
@@ -4210,13 +4214,11 @@ int wc_ecc_shared_secret(ecc_key* private_key, ecc_key* public_key, byte* out,
         if (err != CRYPTOCB_UNAVAILABLE)
             return err;
         /* fall-through when unavailable */
-    #else
-        return err;
     #endif
     }
     #ifdef WOLF_CRYPTO_CB_ONLY_ECC
     else {
-        return NO_VALID_DEVID;
+        err = NO_VALID_DEVID;
     }
     #endif
 #endif
@@ -4262,17 +4264,17 @@ int wc_ecc_shared_secret(ecc_key* private_key, ecc_key* public_key, byte* out,
         return err;
     }
 #elif defined(WOLFSSL_SILABS_SE_ACCEL)
-    err = silabs_ecc_shared_secret(private_key, public_key, out, outlen);
+   err = silabs_ecc_shared_secret(private_key, public_key, out, outlen);
 #elif defined(WOLFSSL_KCAPI_ECC)
    err = KcapiEcc_SharedSecret(private_key, public_key, out, outlen);
 #elif defined(WOLFSSL_SE050)
-    err = se050_ecc_shared_secret(private_key, public_key, out, outlen);
+   err = se050_ecc_shared_secret(private_key, public_key, out, outlen);
 #else
    err = wc_ecc_shared_secret_ex(private_key, &public_key->pubkey, out, outlen);
 #endif /* WOLFSSL_ATECC508A */
+#endif /* WOLF_CRYPTO_CB_ONLY_ECC */
 
    return err;
-#endif /* WOLF_CRYPTO_CB_ONLY_ECC */
 }
 
 
@@ -5798,13 +5800,11 @@ int wc_ecc_sign_hash(const byte* in, word32 inlen, byte* out, word32 *outlen,
         if (err != CRYPTOCB_UNAVAILABLE)
             return err;
         /* fall-through when unavailable */
-    #else
-        return err;
     #endif
     }
     #ifdef WOLF_CRYPTO_CB_ONLY_ECC
     else {
-        return NO_VALID_DEVID;
+        err = NO_VALID_DEVID;
     }
     #endif
 #endif
@@ -5872,15 +5872,15 @@ int wc_ecc_sign_hash(const byte* in, word32 inlen, byte* out, word32 *outlen,
     XFREE(r, key->heap, DYNAMIC_TYPE_ECC);
 #endif
 #endif /* WOLFSSL_ASYNC_CRYPT */
-
-    return err;
 #else
     (void)rng;
     (void)inlen;
     (void)s;
     (void)r;
+    (void)err;
 #endif /* WOLF_CRYPTO_CB_ONLY_ECC */
 
+    return err;
 }
 #endif /* !NO_ASN */
 
@@ -6940,7 +6940,7 @@ int ecc_projective_add_point_safe(ecc_point* A, ecc_point* B, ecc_point* R,
         /* x ordinattes the same. */
         if (mp_cmp(A->y, B->y) == MP_EQ) {
             /* A = B */
-            err = ecc_projective_dbl_point(B, R, a, modulus, mp);
+            err = _ecc_projective_dbl_point(B, R, a, modulus, mp);
         }
         else {
             /* A = -B */
@@ -6954,7 +6954,7 @@ int ecc_projective_add_point_safe(ecc_point* A, ecc_point* B, ecc_point* R,
         }
     }
     else {
-        err = ecc_projective_add_point(A, B, R, a, modulus, mp);
+        err = _ecc_projective_add_point(A, B, R, a, modulus, mp);
         if ((err == MP_OKAY) && mp_iszero(R->z)) {
             /* When all zero then should have done a double */
             if (mp_iszero(R->x) && mp_iszero(R->y)) {
@@ -6964,11 +6964,11 @@ int ecc_projective_add_point_safe(ecc_point* A, ecc_point* B, ecc_point* R,
                         err = mp_montgomery_calc_normalization(R->z, modulus);
                     }
                     if (err == MP_OKAY) {
-                        err = ecc_projective_dbl_point(R, R, a, modulus, mp);
+                        err = _ecc_projective_dbl_point(R, R, a, modulus, mp);
                     }
                 }
                 else {
-                    err = ecc_projective_dbl_point(B, R, a, modulus, mp);
+                    err = _ecc_projective_dbl_point(B, R, a, modulus, mp);
                 }
             }
             /* When only Z zero then result is infinity */
@@ -7002,7 +7002,7 @@ int ecc_projective_dbl_point_safe(ecc_point *P, ecc_point *R, mp_int* a,
         err = wc_ecc_copy_point(P, R);
     }
     else {
-        err = ecc_projective_dbl_point(P, R, a, modulus, mp);
+        err = _ecc_projective_dbl_point(P, R, a, modulus, mp);
     }
 
     return err;
@@ -7388,13 +7388,11 @@ int wc_ecc_verify_hash(const byte* sig, word32 siglen, const byte* hash,
         if (err != CRYPTOCB_UNAVAILABLE)
             return err;
         /* fall-through when unavailable */
-    #else
-        return err;
     #endif
     }
     #ifdef WOLF_CRYPTO_CB_ONLY_ECC
     else {
-        return NO_VALID_DEVID;
+        err = NO_VALID_DEVID;
     }
     #endif
 #endif
@@ -7500,8 +7498,6 @@ int wc_ecc_verify_hash(const byte* sig, word32 siglen, const byte* hash,
 
     /* make sure required variables are reset */
     wc_ecc_reset(key);
-
-    return err;
 #else
     (void)siglen;
     (void)hashlen;
@@ -7511,8 +7507,10 @@ int wc_ecc_verify_hash(const byte* sig, word32 siglen, const byte* hash,
     #endif
     (void)s;
     (void)r;
+    (void)err;
 #endif /* WOLF_CRYPTO_CB_ONLY_ECC */
 
+    return err;
 }
 #endif /* !NO_ASN */
 
@@ -7901,7 +7899,7 @@ int wc_ecc_verify_hash_ex(mp_int *r, mp_int *s, const byte* hash,
 
    /* check for async hardware acceleration */
 #if defined(WOLFSSL_ASYNC_CRYPT) && defined(WC_ASYNC_ENABLE_ECC)
-   if (key->asyncDev.marker == WOLFSSL_ASYNC_MARKER_ECC) {
+   if (err == MP_OKAY && key->asyncDev.marker == WOLFSSL_ASYNC_MARKER_ECC) {
    #if defined(HAVE_CAVIUM_V) || defined(HAVE_INTEL_QA)
    #ifdef HAVE_CAVIUM_V
       if (NitroxEccIsCurveSupported(key))
@@ -10042,7 +10040,7 @@ static int wc_ecc_import_raw_private(ecc_key* key, const char* qx,
     if (err == MP_OKAY) {
         if (mp_iszero(key->pubkey.x) && mp_iszero(key->pubkey.y)) {
             WOLFSSL_MSG("Invalid Qx and Qy");
-            err = BAD_FUNC_ARG;
+            err = ECC_INF_E;
         }
     }
 
@@ -10163,8 +10161,13 @@ static int wc_ecc_import_raw_private(ecc_key* key, const char* qx,
     }
 
 #ifdef WOLFSSL_VALIDATE_ECC_IMPORT
-    if (err == MP_OKAY)
+    if (err == MP_OKAY) {
         err = wc_ecc_check_key(key);
+        if (err == IS_POINT_E && (mp_iszero(key->pubkey.x) ||
+                                  mp_iszero(key->pubkey.y))) {
+            err = BAD_FUNC_ARG;
+        }
+    }
 #endif
 
 #ifdef WOLFSSL_VALIDATE_ECC_IMPORT

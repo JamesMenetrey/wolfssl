@@ -600,7 +600,7 @@ static WC_INLINE void array_add(byte* d, word32 dLen, const byte* s, word32 sLen
             dIdx--;
         }
 
-        for (; carry != 0 && dIdx >= 0; dIdx--) {
+        for (; dIdx >= 0; dIdx--) {
             carry += (word16)d[dIdx];
             d[dIdx] = (byte)carry;
             carry >>= 8;
@@ -2151,7 +2151,7 @@ int wc_GenerateSeed(OS_Seed* os, byte* output, word32 sz)
     #endif /* WOLFSSL_STM32_CUBEMX */
 
 #elif defined(WOLFSSL_TIRTOS)
-
+    #warning "potential for not enough entropy, currently being used for testing"
     #include <xdc/runtime/Timestamp.h>
     #include <stdlib.h>
     int wc_GenerateSeed(OS_Seed* os, byte* output, word32 sz)

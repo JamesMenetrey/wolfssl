@@ -4385,31 +4385,49 @@ int sp_init_multi(sp_int* n1, sp_int* n2, sp_int* n3, sp_int* n4, sp_int* n5,
         _sp_zero(n1);
         n1->dp[0] = 0;
         n1->size = SP_INT_DIGITS;
+    #ifdef HAVE_WOLF_BIGINT
+        wc_bigint_init(&n1->raw);
+    #endif
     }
     if (n2 != NULL) {
         _sp_zero(n2);
         n2->dp[0] = 0;
         n2->size = SP_INT_DIGITS;
+    #ifdef HAVE_WOLF_BIGINT
+        wc_bigint_init(&n2->raw);
+    #endif
     }
     if (n3 != NULL) {
         _sp_zero(n3);
         n3->dp[0] = 0;
         n3->size = SP_INT_DIGITS;
+    #ifdef HAVE_WOLF_BIGINT
+        wc_bigint_init(&n3->raw);
+    #endif
     }
     if (n4 != NULL) {
         _sp_zero(n4);
         n4->dp[0] = 0;
         n4->size = SP_INT_DIGITS;
+    #ifdef HAVE_WOLF_BIGINT
+        wc_bigint_init(&n4->raw);
+    #endif
     }
     if (n5 != NULL) {
         _sp_zero(n5);
         n5->dp[0] = 0;
         n5->size = SP_INT_DIGITS;
+    #ifdef HAVE_WOLF_BIGINT
+        wc_bigint_init(&n5->raw);
+    #endif
     }
     if (n6 != NULL) {
         _sp_zero(n6);
         n6->dp[0] = 0;
         n6->size = SP_INT_DIGITS;
+    #ifdef HAVE_WOLF_BIGINT
+        wc_bigint_init(&n6->raw);
+    #endif
     }
 
     return MP_OKAY;
@@ -5219,11 +5237,13 @@ static int _sp_add_d(sp_int* a, sp_int_digit d, sp_int* r)
             }
         }
         if (i == a->used) {
-            r->used++;
-            if (i < r->size)
+            if (i < r->size) {
+                r->used++;
                 r->dp[i] = 1;
-            else
+            }
+            else {
                 err = MP_VAL;
+            }
         }
     }
     if (err == MP_OKAY) {
@@ -14889,7 +14909,10 @@ static int _sp_read_radix_10(sp_int* a, const char* in)
         if (err != MP_OKAY) {
             break;
         }
-        (void)_sp_add_d(a, ch, a);
+        err = _sp_add_d(a, ch, a);
+        if (err != MP_OKAY) {
+            break;
+        }
     }
 #ifdef WOLFSSL_SP_INT_NEGATIVE
     if ((err == MP_OKAY) && sp_iszero(a)) {
