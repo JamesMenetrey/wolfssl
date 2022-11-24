@@ -1347,8 +1347,8 @@ static int rsa_sign_verify = 0;
 static int use_ffdhe = 0;
 #endif
 
-/* Don't print out in CSV format by default */
-static int csv_format = 0;
+/* Print out in CSV format by default */
+static int csv_format = 1;
 
 #ifdef WOLFSSL_XILINX_CRYPT_VERSAL
 /* Versal PLM maybe prints an error message to the same console.
@@ -1422,7 +1422,7 @@ static void benchmark_static_init(int force)
         bench_asym_algs = 0;
         bench_pq_asym_algs = 0;
         bench_other_algs = 0;
-        csv_format = 0;
+        csv_format = 1;
     }
 }
 
@@ -2756,8 +2756,8 @@ int benchmark_init(void)
     wolfSSL_Debugging_ON();
 #endif
 
-    printf("%swolfCrypt Benchmark (block bytes %d, min %.1f sec each)\n",
-           info_prefix, (int)bench_size, BENCH_MIN_RUNTIME_SEC);
+    //printf("%swolfCrypt Benchmark (block bytes %d, min %.1f sec each)\n",
+    //       info_prefix, (int)bench_size, BENCH_MIN_RUNTIME_SEC);
 #ifndef GENERATE_MACHINE_PARSEABLE_REPORT
     if (csv_format == 1) {
         printf("This format allows you to easily copy the output to a csv file.");
@@ -2931,7 +2931,7 @@ int benchmark_test(void *args)
     benchmarks_do(NULL);
 #endif
     SLEEP_ON_ERROR(1);
-    printf("%sBenchmark complete\n", info_prefix);
+    //printf("%sBenchmark complete\n", info_prefix);
 
     ret = benchmark_free();
 
