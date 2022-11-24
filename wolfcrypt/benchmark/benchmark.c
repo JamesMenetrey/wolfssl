@@ -959,7 +959,7 @@ static const char* bench_desc_words[][15] = {
 
 #endif
 
-#if defined(__GNUC__) && defined(__x86_64__) && !defined(NO_ASM) && !defined(WOLFSSL_SGX) && !defined(WOLFSSL_WASM)
+#if 0
     #define HAVE_GET_CYCLES
     static WC_INLINE word64 get_intel_cycles(void);
     static THREAD_LS_T word64 total_cycles;
@@ -974,7 +974,7 @@ static const char* bench_desc_words[][15] = {
     #define SHOW_INTEL_CYCLES_CSV(b, n, s) \
         (void)XSNPRINTF((b) + XSTRLEN(b), (n) - XSTRLEN(b), "%.6f,\n", \
             count == 0 ? 0 : (float)total_cycles / ((word64)count*(s)))
-#elif defined(LINUX_CYCLE_COUNT)
+#elif 0
     #include <linux/perf_event.h>
     #include <sys/syscall.h>
     #include <unistd.h>
@@ -1005,7 +1005,7 @@ static const char* bench_desc_words[][15] = {
         (void)XSNPRINTF(b + XSTRLEN(b), n - XSTRLEN(b), "%.6f,\n", \
             (float)total_cycles / (count*s))
 
-#elif defined(SYNERGY_CYCLE_COUNT)
+#elif 0
     #include "hal_data.h"
     static THREAD_LS_T word64 begin_cycles;
     static THREAD_LS_T word64 total_cycles;
@@ -1711,9 +1711,9 @@ static void bench_stats_sym_finish(const char* desc, int useDeviceID, int count,
             persec /= base2 ? (1024. * 1024.) : (1000. * 1000.);
 #ifdef GENERATE_MACHINE_PARSEABLE_REPORT
         /* note this codepath brings in all the fields from the non-CSV case. */
-        (void)XSNPRINTF(msg, sizeof(msg), "sym,%s,%s,%lu,%f,%f,%lu,", desc,
+        (void)XSNPRINTF(msg, sizeof(msg), "sym,%s,%s,%lu,%f,%f,", desc,
                         BENCH_ASYNC_GET_NAME(useDeviceID),
-                        bytes_processed, total, persec, total_cycles);
+                        bytes_processed, total, persec);
 #else
         (void)XSNPRINTF(msg, sizeof(msg), "%s,%f,", desc, persec);
 #endif
@@ -1722,9 +1722,9 @@ static void bench_stats_sym_finish(const char* desc, int useDeviceID, int count,
 #ifdef GENERATE_MACHINE_PARSEABLE_REPORT
         (void)XSNPRINTF(msg, sizeof(msg),
                  "%-24s%s %5.0f %s %s %5.3f %s, %8.3f %s/s"
-                 ", %lu cycles,",
+                 ",",
                  desc, BENCH_ASYNC_GET_NAME(useDeviceID), blocks, blockType,
-                 word[0], total, word[1], persec, blockType, total_cycles);
+                 word[0], total, word[1], persec, blockType);
 #else
         (void)XSNPRINTF(msg, sizeof(msg),
                  "%-24s%s %5.0f %s %s %5.3f %s, %8.3f %s/s",
@@ -1799,10 +1799,9 @@ static void bench_stats_asym_finish_ex(const char* algo, int strength,
         }
 #ifdef GENERATE_MACHINE_PARSEABLE_REPORT
         (void)XSNPRINTF(msg, sizeof(msg),
-                        "asym,%s,%d,%s%s,%.3f,%.3f,%d,%f,%lu,%.6f\n",
+                        "asym,%s,%d,%s%s,%.3f,%.3f,%d,%f\n",
                         algo, strength, desc, desc_extra, milliEach, opsSec,
-                        count, total, total_cycles,
-                        (double)total_cycles / (double)count);
+                        count, total);
 #else
         (void)XSNPRINTF(msg, sizeof(msg), "%s,%d,%s%s,%.3f,%.3f,\n", algo,
                         strength, desc, desc_extra, milliEach, opsSec);
@@ -1811,10 +1810,10 @@ static void bench_stats_asym_finish_ex(const char* algo, int strength,
 #ifdef GENERATE_MACHINE_PARSEABLE_REPORT
         (void)XSNPRINTF(msg, sizeof(msg),
                         "%-6s %5d %8s%-2s %s %6d %s %5.3f %s, %s %5.3f ms,"
-                        " %.3f %s, %lu cycles\n", algo, strength, desc,
+                        " %.3f %s\n", algo, strength, desc,
                         desc_extra, BENCH_ASYNC_GET_NAME(useDeviceID),
                         count, word[0], total, word[1], word[2], milliEach,
-                        opsSec, word[3], total_cycles);
+                        opsSec, word[3]);
 #else
         (void)XSNPRINTF(msg, sizeof(msg),
                         "%-6s %5d %8s%-2s %s %6d %s %5.3f %s, %s %5.3f ms,"
@@ -1891,9 +1890,8 @@ static void bench_stats_pq_asym_finish(const char* algo, int useDeviceID, int co
         }
 #ifdef GENERATE_MACHINE_PARSEABLE_REPORT
         (void)XSNPRINTF(msg, sizeof(msg),
-                        "pq_asym,%s,%.3f,%.3f,%d,%f,%lu,%.6f,\n",
-                        algo, milliEach, opsSec, count, total, total_cycles,
-                        (double)total_cycles / (double)count);
+                        "pq_asym,%s,%.3f,%.3f,%d,%f,\n",
+                        algo, milliEach, opsSec, count, total);
 #else
         (void)XSNPRINTF(msg, sizeof(msg), "%s %.3f,%.3f,\n", algo, milliEach,
                         opsSec);
@@ -1902,10 +1900,10 @@ static void bench_stats_pq_asym_finish(const char* algo, int useDeviceID, int co
 #ifdef GENERATE_MACHINE_PARSEABLE_REPORT
          (void)XSNPRINTF(msg, sizeof(msg),
                          "%-18s %s %6d %s %5.3f %s, %s %5.3f ms,"
-                         " %.3f %s, %lu cycles\n",
+                         " %.3f %s\n",
                          algo, BENCH_ASYNC_GET_NAME(useDeviceID),
                          count, word[0], total, word[1], word[2], milliEach,
-                         opsSec, word[3], total_cycles);
+                         opsSec, word[3]);
 #else
          (void)XSNPRINTF(msg, sizeof(msg), "%-18s %s %6d %s %5.3f %s, %s %5.3f ms,"
          " %.3f %s\n", algo, BENCH_ASYNC_GET_NAME(useDeviceID),
