@@ -1648,8 +1648,8 @@ static void bench_stats_sym_finish(const char* desc, int useDeviceID, int count,
         /* only print out header once */
         if (sym_header_printed == 0) {
 #ifdef GENERATE_MACHINE_PARSEABLE_REPORT
-            printf("%s", "\"sym\",Algorithm,HW/SW,bytes_total,seconds_total,"
-                   "MB/s,cycles_total,Cycles per byte,\n");
+            //printf("%s", "\"sym\",Algorithm,HW/SW,bytes_total,seconds_total,"
+            //       "MB/s,cycles_total,Cycles per byte,\n");
 #else
             printf("\n\nSymmetric Ciphers:\n\n");
             printf("Algorithm,MB/s,Cycles per byte,\n");
@@ -1788,8 +1788,8 @@ static void bench_stats_asym_finish_ex(const char* algo, int strength,
         /* only print out header once */
         if (asym_header_printed == 0) {
 #ifdef GENERATE_MACHINE_PARSEABLE_REPORT
-            printf("%s", "\"asym\",Algorithm,key size,operation,avg ms,ops/sec,"
-                   "ops,secs,cycles,cycles/op\n");
+            //printf("%s", "\"asym\",Algorithm,key size,operation,avg ms,ops/sec,"
+            //       "ops,secs,cycles,cycles/op\n");
 #else
             printf("\n%sAsymmetric Ciphers:\n\n", info_prefix);
             printf("%sAlgorithm,key size,operation,avg ms,ops/sec,\n",
