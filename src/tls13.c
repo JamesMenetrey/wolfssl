@@ -7078,6 +7078,20 @@ static int SendTls13EncryptedExtensions(WOLFSSL* ssl)
                                ENCRYPT_AND_DECRYPT_SIDE, 1)) != 0)
         return ret;
 
+#ifdef HAVE_REMOTE_ATTESTATION
+    // TODO: Does this belong here? It should be AFTER input hashing (for the TLS exporter)
+    //       and before writing encrypted extensions.
+    if (ssl->attestationRequest) {
+        if ((ret = GenerateAttestation(ssl)) != 0) {
+            if (ret == ATTESTATION_TYPE_SUPPORT_E) {
+                SendAlert(ssl, alert_fatal, unsupported_attestation);
+                WOLFSSL_ERROR_VERBOSE(ATTESTATION_TYPE_SUPPORT_E);
+            }
+            return ret;
+        }
+    }
+#endif /* HAVE_REMOTE_ATTESTATION */
+
     /* Setup encrypt/decrypt keys for following messages. */
 #ifdef WOLFSSL_EARLY_DATA
     if ((ret = SetKeysSide(ssl, ENCRYPT_SIDE_ONLY)) != 0)
@@ -9152,6 +9166,17 @@ static int DoTls13CertificateVerify(WOLFSSL* ssl, byte* input,
                 ssl->options.peerAuthGood = 1;
             }
         #endif /* !NO_RSA && WC_RSA_PSS */
+
+        #ifdef HAVE_REMOTE_ATTESTATION \
+            // TODO: Does this belong here? It should be AFTER input hashing (for the TLS exporter)
+            //       and after receiving encrypted extensions.
+            if (ssl->attestationRequest && ssl->verifyAttestation) {
+                ret = VerifyAttestation(ssl);
+                if (ret != 0) {
+                    goto exit_dcv;
+                }
+            }
+        #endif
 
             /* Advance state and proceed */
             ssl->options.asyncState = TLS_ASYNC_FINALIZE;

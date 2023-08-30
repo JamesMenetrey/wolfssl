@@ -763,6 +763,7 @@ enum AlertDescription {
     bad_certificate_status_response = 113, /**< RFC 6066, section 8 */
     unknown_psk_identity            = 115, /**< RFC 4279, section 2 */
     certificate_required            = 116, /**< RFC 8446, section 8.2 */
+    unsupported_attestation         = 118, /**< remote attestation, arbitrary value for now */
     no_application_protocol         = 120
 };
 
@@ -3664,6 +3665,108 @@ WOLFSSL_ABI WOLFSSL_API int wolfSSL_CTX_GetDevId(WOLFSSL_CTX* ctx, WOLFSSL* ssl)
 WOLFSSL_API void* wolfSSL_CTX_GetHeap(WOLFSSL_CTX* ctx, WOLFSSL* ssl);
 
 /* TLS Extensions */
+
+#ifdef HAVE_REMOTE_ATTESTATION
+// TODO: WIP definitions
+
+#define ATT_CHALLENGE_LABEL "EXPORTER: Remote Attestation"
+#define ATT_CHALLENGE_LABEL_LEN strlen(ATT_CHALLENGE_LABEL)
+#define ATT_BUFFER_SIZE 16384
+
+/**
+ * Attestation Request data type.
+ */
+typedef struct ATT_REQUEST {
+    /** Is this union a request or a response (from either client or server) */
+    word8 is_request;
+    /** The nonce for challenge generation */
+    word64 nonce;
+    /** The challenge size required for attestation verification */
+    // TODO: This could be fixed size if the types are well-defined and have well-defined challenge sizes.
+    //       However, this would need to be managed by IANA, e.g.
+    //       The type can then also be a simple enumeration for further simplicity.
+    word16 challengeSize;
+    /** The .data size */
+    word16 size;
+    /**
+     * If request: attestation type
+     * If response: attestation certificate
+     */
+    void *data;
+} ATT_REQUEST;
+
+/**
+ * The attestation generation callback.
+ *
+ * @param req       The attestation request to generate data from
+ * @param c         The challenge (from TLS-exporter) to create a fresh attestation certificate.
+ *                  Its length can be inferred by the attestation field `challengeSize`.
+ * @param output    The output buffer to store the attestation data.
+ *                  Its length is `ATT_BUFFER_SIZE`:
+ * @return  Must be number of written bytes.
+ *          ATTESTATION_TYPE_SUPPORT_E if attestation type is unsupported (needed to send alert).
+ *          Any other negative number indicates other failure type
+ */
+typedef int (*GenAttCallback)(const ATT_REQUEST *req, const byte *c, byte *output);
+/**
+ * The attestation verify callback.
+ * @param att   The attestation-/certificate data
+ * @param c     The re-created challenge used for the attestation
+ *              Its length can be inferred by the attestation field `challengeSize`.
+ * @return Must be 0 on success.
+ */
+typedef int (*VerifyAttCallback)(const ATT_REQUEST *att, const byte *c);
+
+/**
+ * Prints an attestation request to the given file.
+ * @param fp                The FILE pointer to print to
+ * @param req               The attestation request to print
+ * @see wolfSSL_AttestationRequest_print_ex
+ */
+WOLFSSL_API void wolfSSL_AttestationRequest_print(XFILE fp, const ATT_REQUEST *req);
+
+/**
+ * Prints an attestation request to the given file.
+ * @param fp                The FILE pointer to print to
+ * @param req               The attestation request to print
+ * @param dataIsStr         Whether the attestation type / certificate should be printed as a string
+ * @see wolfSSL_AttestationRequest_print
+ */
+WOLFSSL_API void wolfSSL_AttestationRequest_print_ex(XFILE fp, const ATT_REQUEST *req, byte dataIsStr);
+
+/**
+ * Attestation Request extension.
+ */
+WOLFSSL_API int wolfSSL_AttestationRequest(WOLFSSL *ssl, const ATT_REQUEST *req);
+
+/**
+ * Sets the callback for attestation verification on 'client' side.
+ *
+ * @param ssl       The SSL session
+ * @param verifyAtt The attestation verify callback.
+ * @return SSL_SUCCESS if client, SIDE_ERROR if server, and BAD_FUNC_ARG if any param is NULL.
+ */
+WOLFSSL_API int wolfSSL_SetVerifyAttestation(WOLFSSL *ssl, VerifyAttCallback verifyAtt);
+
+/**
+ * Sets the callback for attestation generation on 'server' side.
+ *
+ * @param ssl       The SSL session
+ * @param genAtt    The attestation generator.
+ * @return SSL_SUCCESS if server, SIDE_ERROR if client, and BAD_FUNC_ARG if any param is NULL.
+ */
+WOLFSSL_API int wolfSSL_SetGenerateAttestation(WOLFSSL *ssl, GenAttCallback genAtt);
+
+/**
+ * Returns a received attestation request.
+ * Will be NULL if not received.
+ *
+ * @param ssl The SSL session
+ * @return received attestation request data. NULL if not present.
+ */
+WOLFSSL_API const ATT_REQUEST *wolfSSL_GetAttestationRequest(WOLFSSL *ssl);
+
+#endif /* HAVE_REMOTE_ATTESTATION */
 
 /* Server Name Indication */
 #ifdef HAVE_SNI
